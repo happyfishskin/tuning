@@ -21,6 +21,7 @@ __global__ void dummyKernel(float *A, float *B, float *C, int N) {
 }
 """
 
+# PyCUDA 會呼叫 NVIDIA 的 NVCC 編譯器將其編譯成 GPU 的二進位碼 (PTX)
 mod = SourceModule(kernel_code)
 dummy_kernel = mod.get_function("dummyKernel")
 
@@ -41,7 +42,10 @@ def measure_time(N, block_size_x, block_size_y, grid_size_x, grid_size_y, repeat
     start.record()
     for _ in range(repeat):
         dummy_kernel(output_gpu, np.int32(N), block=block, grid=grid)
+    # 在所有 kernel 執行指令之後，插入一個「記錄結束時間」的標記
     end.record()
+    # 它會暫停 CPU 的執行，直到 GPU 完成了佇列中所有在 end.record() 之前的指令。
+    # 沒有這一步，CPU 會立刻計算時間，而那時 GPU 可能還沒開始或尚未完成工作。
     end.synchronize()
 
     elapsed_time = start.time_till(end) / repeat  # ms
@@ -50,7 +54,7 @@ def measure_time(N, block_size_x, block_size_y, grid_size_x, grid_size_y, repeat
 
 def run_tuning(N, output_csv="dummy_tuning.csv"):
     block_sizes = [32, 64, 128, 256]
-    grid_sizes = [16, 32, 64, 128]
+    grid_sizes = [16, 32, 64, 128] # 它其實是用於 block_y
 
     results = []
     best_time = float("inf")
